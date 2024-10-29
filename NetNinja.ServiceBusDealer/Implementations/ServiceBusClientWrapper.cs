@@ -2,6 +2,7 @@ using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using NetNinja.ServiceBusDealer.Configurations;
 using NetNinja.ServiceBusDealer.Contracts;
+using Action = NetNinja.ServiceBusDealer.Models.Enums.Action;
 
 namespace NetNinja.ServiceBusDealer.Implementations
 {
@@ -9,19 +10,21 @@ namespace NetNinja.ServiceBusDealer.Implementations
     {
         public ServiceBusClient Client { get; set; }
         public ServiceBusSender Sender { get; set; }
+        private readonly ServiceBusConfiguration _serviceBusConfiguration;
 
         public ServiceBusClientWrapper(ServiceBusConfiguration config, ServiceBusClient? client = null, ServiceBusSender? sender = null)
         {
             Client = client ?? new ServiceBusClient(config.ConnectionString);
             Sender = sender ?? Client.CreateSender(config.QueueName);
-            InitializeClient(config);
+            _serviceBusConfiguration = config;
+            // InitializeClient(config);
         }
 
-        private void InitializeClient(ServiceBusConfiguration config)
+        /*private void InitializeClient(ServiceBusConfiguration config)
         {
             Client = new ServiceBusClient(config.ConnectionString);
             Sender = Client.CreateSender(config.QueueName);
-        }
+        }*/
 
         #region Unique Message
 
@@ -120,10 +123,88 @@ namespace NetNinja.ServiceBusDealer.Implementations
             }
         }
         #endregion
-        
-        
+
+        public async Task<List<string>> ReceiveBatchOfMessages(int maxMessagesToReceive)
+        {
+            try
+            {
+                ServiceBusReceiver receiver = Client.CreateReceiver(_serviceBusConfiguration.QueueName);
+
+                IReadOnlyList<ServiceBusReceivedMessage> receivedMessages =
+                    await receiver.ReceiveMessagesAsync(maxMessages: 2 /*maxMessagesToReceive*/);
+
+                var messagesReceived = new List<string>();
+
+                foreach (var receivedMessage in receivedMessages)
+                {
+                    string body = receivedMessage.Body.ToString();
+
+                    messagesReceived.Add(body);
+                }
+
+                return messagesReceived;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+        }
+
+        public async Task HandleMessage(Action action , string reason , string description )
+        {
+            try
+            {
+                ServiceBusReceiver receiver = Client.CreateReceiver(_serviceBusConfiguration.QueueName);
+
+                ServiceBusReceivedMessage receivedMessage = await receiver.ReceiveMessageAsync();
+
+                switch (action)
+                {
+                    case Action.Complete : await receiver.CompleteMessageAsync(receivedMessage);
+                        break;
+                    
+                    case Action.Abandon : await receiver.AbandonMessageAsync(receivedMessage);
+                        break;
+                    
+                    case Action.Defer : await receiver.DeferMessageAsync(receivedMessage);
+                        break;
+                    
+                    case Action.DeadLetter :
+                        if (!string.IsNullOrEmpty(reason) && !string.IsNullOrEmpty(description))
+                        {
+                            await DeadLetterAMessageAsync( receiver , receivedMessage , reason , description);
+                        }
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+        }
 
         #region Private Methods
+
+        private async Task DeadLetterAMessageAsync( ServiceBusReceiver receiver , ServiceBusReceivedMessage receivedMessage , string reason , string description )
+        {
+            await receiver.DeadLetterMessageAsync(receivedMessage, reason, description);
+
+            ServiceBusReceiver dlqReceiver = Client.CreateReceiver(_serviceBusConfiguration.QueueName,
+                new ServiceBusReceiverOptions
+                {
+                    SubQueue = SubQueue.DeadLetter
+                });
+
+            ServiceBusReceivedMessage dlqMessage = await dlqReceiver.ReceiveMessageAsync();
+            
+            string dlqReason = dlqMessage.DeadLetterReason;
+            string dlqDescription = dlqMessage.DeadLetterErrorDescription;
+            
+            Console.WriteLine($"dlqReason: {dlqReason}");
+            Console.WriteLine($"dlqDescription: {dlqDescription}");
+        }
 
         private Queue<ServiceBusMessage> SerializeBatchMessages(List<T> messages)
         {
