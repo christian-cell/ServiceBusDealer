@@ -5,10 +5,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PackageId>NetNinja.ServiceBusDealer</PackageId>
-        <Version>1.0.3</Version>
+        <Version>1.0.5</Version>
         <Authors>Christian García Martín</Authors>
         <Description>ServiceBus event sender</Description>
-        <RepositoryUrl>https://github.com/tu-repositorio</RepositoryUrl>
+        <RepositoryUrl>https://github.com/christian-cell/ServiceBusDealer/tree/master</RepositoryUrl>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IncludeBuildOutput>true</IncludeBuildOutput>
     </PropertyGroup>
