@@ -93,7 +93,7 @@ Receive a batch of messages
     await _serviceBusClientWrapper.ReceiveBatchOfMessages( maxMessagesToReceive )
 ```
 
-5**HandleMessage**
+6**HandleMessage**
 After send the message you can: complete , abandone , defer or deadLetter it.
 
 ```
