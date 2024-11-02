@@ -13,6 +13,7 @@ namespace NetNinja.ServiceBusDealer.Tests
     public class ServiceBusClientWrapperTests
     {
         private readonly Mock<ServiceBusSender> _mockSender;
+        private readonly Mock<ServiceBusReceiver> _mockReceiver;
         private readonly ServiceBusClientWrapper<ServiceBusMessageCommad.ServiceBusMessageCommand> _serviceBusClientWrapper;
 
         public ServiceBusClientWrapperTests()
@@ -34,6 +35,9 @@ namespace NetNinja.ServiceBusDealer.Tests
                 .Returns(Task.CompletedTask);
 
             Mock<ServiceBusClient> mockClient = new();
+            
+            _mockReceiver = new Mock<ServiceBusReceiver>();
+            
             mockClient.Setup(c => c.CreateSender(It.IsAny<string>()))
                 .Returns(_mockSender.Object);
 
@@ -109,6 +113,25 @@ namespace NetNinja.ServiceBusDealer.Tests
 
             _mockSender.Verify(sender => sender.SendMessagesAsync(It.IsAny<IEnumerable<ServiceBusMessage>>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
+        
+        /*[Fact]
+        public async Task ReceiveBatchOfMessages_ShouldReturnMessages()
+        {
+            var serviceBusMessages = new List<ServiceBusReceivedMessage>
+            {
+                ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData("Message 1")),
+                ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData("Message 2"))
+            };
+
+            _mockReceiver.Setup(receiver => receiver.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(serviceBusMessages);
+
+            var result = await _serviceBusClientWrapper.ReceiveBatchOfMessages(2);
+
+            Assert.Equal(2, result.Count);
+            Assert.Contains("Message 1", result);
+            Assert.Contains("Message 2", result);
+        }*/
     }
 };
 
