@@ -9,7 +9,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PackageId>NetNinja.ServiceBusDealer.Tests</PackageId>
-        <Version>1.0.5</Version>
+        <Version>1.0.9</Version>
         <Authors>Christian García Martín</Authors>
         <Description>ServiceBus event sender tests</Description>
         <RepositoryUrl>https://github.com/christian-cell/ServiceBusDealer/tree/master</RepositoryUrl>
