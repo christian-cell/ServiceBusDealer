@@ -1,4 +1,4 @@
-![alt text](image.png)
+![alt text](ReadmeImages/image.png)
 
 # ServiceBusDealer
 
@@ -34,7 +34,6 @@ Do not worry abot Serialize , the nuget with deal with that.
 In this nuget there are 4 ways to send messages to ServiceBus:
 
 1. **SendMessageAsync**:
-
 Send a Single message
 
 ```
@@ -55,7 +54,7 @@ Send a message of type List<>
 ```
 
 3. **SendMessagesAsync**
-send several messages at the same time
+Send several messages at the same time
 
 ```
     var listOfMessages = new List<ServiceBusMessageCommand>();
@@ -83,3 +82,33 @@ send several messages wrapped in a Batch
     
     await _serviceBusClientWrapper.SendBatchOfMessagesAsync(listOfMessages);
 ```
+
+5**ReceiveBatchOfMessages**
+Receive a batch of messages
+
+```
+   /*
+   * @params : int maxMessagesToReceive 
+   */
+    await _serviceBusClientWrapper.ReceiveBatchOfMessages( maxMessagesToReceive )
+```
+
+6**HandleMessage**
+After send the message you can: complete , abandone , defer or deadLetter it.
+
+```
+    /*
+    * @params :Action action , string reason , string description
+    */
+    await _serviceBusClientWrapper.HandleMessage(action , reason , description )
+    
+    public enum Action
+    {
+        Complete,
+        Abandon,
+        Defer,
+        DeadLetter
+    }
+```
+
+
