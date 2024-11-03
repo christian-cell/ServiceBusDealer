@@ -7,6 +7,7 @@ using NetNinja.ServiceBusDealer.Implementations;
 using NetNinja.ServiceBusDealer.Tests.mocks;
 using NetNinja.ServiceBusDealer.Tests.models;
 using Xunit;
+using Action = NetNinja.ServiceBusDealer.Models.Enums.Action;
 
 namespace NetNinja.ServiceBusDealer.Tests
 {
@@ -14,7 +15,7 @@ namespace NetNinja.ServiceBusDealer.Tests
     {
         private readonly Mock<ServiceBusSender> _mockSender;
         private readonly Mock<ServiceBusReceiver> _mockReceiver;
-        private readonly ServiceBusClientWrapper<ServiceBusMessageCommad.ServiceBusMessageCommand> _serviceBusClientWrapper;
+        private readonly ServiceBusClientWrapper<ServiceBusMessageCommand> _serviceBusClientWrapper;
 
         public ServiceBusClientWrapperTests()
         {
@@ -40,8 +41,11 @@ namespace NetNinja.ServiceBusDealer.Tests
             
             mockClient.Setup(c => c.CreateSender(It.IsAny<string>()))
                 .Returns(_mockSender.Object);
+            
+            mockClient.Setup(c => c.CreateReceiver(It.IsAny<string>()))
+                .Returns(_mockReceiver.Object);
 
-            _serviceBusClientWrapper = new ServiceBusClientWrapper<ServiceBusMessageCommad.ServiceBusMessageCommand>(config)
+            _serviceBusClientWrapper = new ServiceBusClientWrapper<ServiceBusMessageCommand>(config)
             {
                 Client = mockClient.Object,
                 Sender = _mockSender.Object
@@ -51,7 +55,7 @@ namespace NetNinja.ServiceBusDealer.Tests
         [Fact]
         public async Task SendMessageAsync_ShouldSendMessage()
         {
-            var message = new ServiceBusMessageCommad.ServiceBusMessageCommand { Message = "Hello Service Bus!", Emissor = "Test", Receptor = "Test" };
+            var message = new ServiceBusMessageCommand { Message = "Hello Service Bus!", Emissor = "Test", Receptor = "Test" };
             var serializedMessage = JsonSerializer.Serialize(message);
             var busMessage = new ServiceBusMessage(serializedMessage);
 
@@ -114,24 +118,73 @@ namespace NetNinja.ServiceBusDealer.Tests
             _mockSender.Verify(sender => sender.SendMessagesAsync(It.IsAny<IEnumerable<ServiceBusMessage>>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
         
-        /*[Fact]
-        public async Task ReceiveBatchOfMessages_ShouldReturnMessages()
+        [Fact]
+        public async Task ReceiveBatchOfMessages_ShouldReturnListOfMessages()
         {
-            var serviceBusMessages = new List<ServiceBusReceivedMessage>
+            // Arrange
+            var mockReceiver = new Mock<ServiceBusReceiver>();
+            var receivedMessages = new List<ServiceBusReceivedMessage>
             {
-                ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData("Message 1")),
-                ServiceBusModelFactory.ServiceBusReceivedMessage(body: new BinaryData("Message 2"))
+                ServiceBusModelFactory.ServiceBusReceivedMessage(new BinaryData("Message 1")),
+                ServiceBusModelFactory.ServiceBusReceivedMessage(new BinaryData("Message 2"))
             };
 
-            _mockReceiver.Setup(receiver => receiver.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(serviceBusMessages);
-
+            _mockReceiver.Setup(r => r.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(receivedMessages);
+            
+            // Act
             var result = await _serviceBusClientWrapper.ReceiveBatchOfMessages(2);
 
+            // Assert
             Assert.Equal(2, result.Count);
             Assert.Contains("Message 1", result);
             Assert.Contains("Message 2", result);
-        }*/
+        }
+        
+        [Theory]
+        [InlineData(Action.Complete)]
+        [InlineData(Action.Abandon)]
+        [InlineData(Action.Defer)]
+        //TODO [InlineData(Action.DeadLetter)]
+        public async Task HandleMessage_ShouldHandleMessageBasedOnAction(Action action)
+        {
+            // Arrange
+            var mockReceiver = new Mock<ServiceBusReceiver>();
+            var receivedMessage = ServiceBusModelFactory.ServiceBusReceivedMessage(new BinaryData("Test Message"));
+            var messages = new List<Azure.Messaging.ServiceBus.ServiceBusReceivedMessage>();
+            messages.Add(receivedMessage);
+
+            mockReceiver
+                .Setup(r => r.ReceiveMessagesAsync(It.IsAny<int>(), It.IsAny<TimeSpan?>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(messages);
+
+            var mockClient = new Mock<ServiceBusClient>();
+            mockClient.Setup(c => c.CreateReceiver(It.IsAny<string>()))
+                .Returns(mockReceiver.Object);
+
+            // Act
+            await _serviceBusClientWrapper.HandleMessage(action, "Test Reason", "Test Description");
+            
+            await mockReceiver.Object.AbandonMessageAsync(receivedMessage, null, It.IsAny<CancellationToken>());
+            await mockReceiver.Object.CompleteMessageAsync(receivedMessage,  It.IsAny<CancellationToken>());
+            await mockReceiver.Object.DeferMessageAsync(receivedMessage, null, It.IsAny<CancellationToken>());
+
+            // Assert
+            switch (action)
+            {
+                case Action.Complete:
+                    mockReceiver.Verify(r => r.CompleteMessageAsync(receivedMessage, It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                    break;
+                case Action.Abandon:
+                    mockReceiver.Verify(r => r.AbandonMessageAsync(receivedMessage, null, It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                    break;
+                case Action.Defer:
+                    mockReceiver.Verify(r => r.DeferMessageAsync(receivedMessage, null, It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+                    break;
+            }
+        }
+
     }
 };
 

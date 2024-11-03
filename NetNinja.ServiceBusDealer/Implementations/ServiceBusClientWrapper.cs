@@ -129,9 +129,10 @@ namespace NetNinja.ServiceBusDealer.Implementations
             try
             {
                 ServiceBusReceiver receiver = Client.CreateReceiver(_serviceBusConfiguration.QueueName);
+                
+                var maxWaitTime = TimeSpan.FromSeconds(15); 
 
-                IReadOnlyList<ServiceBusReceivedMessage> receivedMessages =
-                    await receiver.ReceiveMessagesAsync(maxMessages: 2 /*maxMessagesToReceive*/);
+                IReadOnlyList<ServiceBusReceivedMessage> receivedMessages = await receiver.ReceiveMessagesAsync(maxMessages: 2 , maxWaitTime );
 
                 var messagesReceived = new List<string>();
 
@@ -157,7 +158,7 @@ namespace NetNinja.ServiceBusDealer.Implementations
             {
                 ServiceBusReceiver receiver = Client.CreateReceiver(_serviceBusConfiguration.QueueName);
 
-                ServiceBusReceivedMessage receivedMessage = await receiver.ReceiveMessageAsync();
+                ServiceBusReceivedMessage receivedMessage = await receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
 
                 switch (action)
                 {
